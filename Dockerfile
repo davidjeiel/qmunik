@@ -1,38 +1,32 @@
-# Base para a aplicação Node.js
-FROM node:16 AS node-builder
+# Etapa 1: Construção da aplicação usando Node.js
+FROM node:18 AS build
 
-# Diretório de trabalho
-WORKDIR /home/qmunik
+# Define o diretório de trabalho dentro do contêiner
+WORKDIR /app
 
-# Copiar arquivos necessários para instalar as dependências
+# Copia os arquivos de configuração e dependências
 COPY package*.json ./
 
-# Instalar dependências
+# Instala as dependências
 RUN npm install
 
-# Copiar o restante do código para o diretório de trabalho
+# Copia os arquivos do projeto para o diretório de trabalho
 COPY . .
 
-# Construir o aplicativo, se necessário (opcional)
-# RUN npm run build
+# Realiza o build da aplicação com o Vite
+RUN npm run build
 
-# Base para o servidor Nginx
+# Etapa 2: Servir os arquivos estáticos com NGINX
 FROM nginx:alpine
 
-# Copiar os arquivos estáticos para o diretório padrão do Nginx
-COPY public /usr/share/nginx/html
+# Remove os arquivos padrão do NGINX
+RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar o arquivo de configuração personalizado do Nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copia os arquivos estáticos gerados pelo Vite para o diretório padrão do NGINX
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copiar a aplicação Node.js para rodar no mesmo container
-COPY --from=node-builder /home/qmunik2 /usr/src/app
+# Exponha a porta 80 para acesso
+EXPOSE 3030
 
-# Instalar PM2 para gerenciar a aplicação Node.js
-RUN apk add --no-cache nodejs npm && npm install -g pm2
-
-# Expor portas para Nginx (80) e Node.js (3000)
-EXPOSE 80 3000
-
-# Comando para rodar Nginx e Node.js
-CMD ["sh", "-c", "nginx && pm2-runtime /usr/src/app/app.js"]
+# Comando padrão para iniciar o NGINX
+CMD ["nginx", "-g", "daemon off;"]
